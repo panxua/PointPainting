@@ -1,6 +1,7 @@
 from functools import partial
 
 import numpy as np
+import torch
 
 from ...utils import box_utils, common_utils
 
@@ -42,16 +43,18 @@ class DataProcessor(object):
 
     def transform_points_to_voxels(self, data_dict=None, config=None, voxel_generator=None):
         if data_dict is None:
-            try:
-                from spconv.utils import VoxelGeneratorV2 as VoxelGenerator
-            except:
-                from spconv.utils import VoxelGenerator
+            from spconv.pytorch.utils import PointToVoxel as VoxelGenerator
+            # try:
+            #     from spconv.utils import VoxelGeneratorV2 as VoxelGenerator
+            # except:
+                # from spconv.utils import VoxelGenerator
 
             voxel_generator = VoxelGenerator(
-                voxel_size=config.VOXEL_SIZE,
-                point_cloud_range=self.point_cloud_range,
-                max_num_points=config.MAX_POINTS_PER_VOXEL,
-                max_voxels=config.MAX_NUMBER_OF_VOXELS[self.mode]
+                vsize_xyz=config.VOXEL_SIZE,
+                coors_range_xyz=self.point_cloud_range,
+                num_point_features=config.NUM_POINT_FEATURES,
+                max_num_voxels=config.MAX_NUMBER_OF_VOXELS[self.mode],
+                max_num_points_per_voxel=config.MAX_POINTS_PER_VOXEL,
             )
             grid_size = (self.point_cloud_range[3:6] - self.point_cloud_range[0:3]) / np.array(config.VOXEL_SIZE)
             self.grid_size = np.round(grid_size).astype(np.int64)
@@ -59,7 +62,7 @@ class DataProcessor(object):
             return partial(self.transform_points_to_voxels, voxel_generator=voxel_generator)
 
         points = data_dict['points']
-        voxel_output = voxel_generator.generate(points)
+        voxel_output = voxel_generator(torch.torch.from_numpy(points))
         if isinstance(voxel_output, dict):
             voxels, coordinates, num_points = \
                 voxel_output['voxels'], voxel_output['coordinates'], voxel_output['num_points_per_voxel']
